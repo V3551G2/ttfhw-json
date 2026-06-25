@@ -351,18 +351,17 @@ def _compare_keys(data: dict, template: dict, base_path: str,
 
     missing = t_keys - d_keys
     for k in sorted(missing):
-        # Some keys are conditionally present — mark conditionally required ones as warnings
         if k in ("failure_reason", "note"):
-            continue  # handled by conditional_field check
+            continue
         issues.add("warning", "template_structure",
                    fmt_path(base_path, k) if base_path else f"$.{k}",
-                   f"Missing key '{k}' (present in standard template)")
+                   f"缺少字段 '{k}'（标准模板中存在）")
 
     extra = d_keys - t_keys
     for k in sorted(extra):
         issues.add(unknown_as, "template_structure",
                    fmt_path(base_path, k) if base_path else f"$.{k}",
-                   f"Unknown key '{k}' (not in standard template)")
+                   f"未知字段 '{k}'（不在标准模板中）")
 
     # Recurse into common nested dicts
     for k in t_keys & d_keys:
@@ -384,11 +383,11 @@ def check_valid_json(filepath: str, issues: IssueCollector) -> Optional[dict]:
         return data
     except json.JSONDecodeError as e:
         issues.add("error", "valid_json", "$",
-                   f"Invalid JSON: {e.msg} at line {e.lineno}, col {e.colno}")
+                   f"JSON 解析失败: {e.msg}（第 {e.lineno} 行，第 {e.colno} 列）")
         return None
     except Exception as e:
         issues.add("error", "valid_json", "$",
-                   f"Cannot read file: {e}")
+                   f"无法读取文件: {e}")
         return None
 
 
@@ -400,10 +399,10 @@ def check_top_level_keys(data: dict, issues: IssueCollector):
 
     for k in missing:
         issues.add("error", "top_level_keys", "$",
-                   f"Missing required top-level key: '{k}'")
+                   f"缺少必需的顶级字段: '{k}'")
     for k in extra:
         issues.add("notice", "top_level_keys", f"$.{k}",
-                   f"Unknown top-level key: '{k}' (not in standard template)")
+                   f"未知顶级字段: '{k}'（不在标准模板中）")
 
 
 def check_metadata(data: dict, issues: IssueCollector):
@@ -413,25 +412,25 @@ def check_metadata(data: dict, issues: IssueCollector):
     for field in required:
         if field not in meta:
             issues.add("error", "metadata", "$.metadata",
-                       f"Missing required field 'metadata.{field}'")
+                       f"metadata 缺少必需字段 '{field}'")
         elif meta[field] is None:
             issues.add("error", "metadata", f"$.metadata.{field}",
-                       f"Field 'metadata.{field}' is null, expected non-null")
+                       f"metadata.{field} 为 null，应为非空值")
 
     # Type checks
     if isinstance(meta.get("duration_seconds"), bool):
         issues.add("error", "metadata_type", "$.metadata.duration_seconds",
-                   "duration_seconds is boolean, expected integer")
+                   "duration_seconds 为布尔值，应为整数")
     elif "duration_seconds" in meta and not isinstance(meta.get("duration_seconds"), int):
         issues.add("error", "metadata_type", "$.metadata.duration_seconds",
-                   f"duration_seconds should be int, got {type(meta['duration_seconds']).__name__}")
+                   f"duration_seconds 应为整数，实际为 {type(meta['duration_seconds']).__name__}")
 
     if isinstance(meta.get("total_steps"), bool):
         issues.add("error", "metadata_type", "$.metadata.total_steps",
-                   "total_steps is boolean, expected integer")
+                   "total_steps 为布尔值，应为整数")
     elif "total_steps" in meta and not isinstance(meta.get("total_steps"), int):
         issues.add("error", "metadata_type", "$.metadata.total_steps",
-                   f"total_steps should be int, got {type(meta['total_steps']).__name__}")
+                   f"total_steps 应为整数，实际为 {type(meta['total_steps']).__name__}")
 
 
 def check_iso8601_timestamps(data: dict, issues: IssueCollector):
@@ -587,13 +586,13 @@ def check_type_correctness(data: dict, issues: IssueCollector):
     if isinstance(container, dict) and "memory" not in container:
         issues.add("warning", "type_check",
                    "$.machine_spec.container",
-                   "container.memory key is missing — should be present even if 'N/A'")
+                   "缺少 container.memory 字段 — 即使值为 'N/A' 也应存在")
     elif isinstance(container, dict) and "memory" in container:
         mem = container["memory"]
         if mem is None:
             issues.add("warning", "type_check",
                        "$.machine_spec.container.memory",
-                       "container.memory is null — use 'N/A' string if unavailable")
+                       "container.memory 为 null — 不可用时建议使用 'N/A' 字符串")
 
 
 def check_precommit_consistency(data: dict, issues: IssueCollector):
@@ -634,8 +633,8 @@ def check_duration_consistency(data: dict, issues: IssueCollector):
                 if ratio > 0.15:  # >15% off
                     issues.add("warning", "duration_consistency",
                                "$.metadata",
-                               f"Declared duration_seconds={declared} but "
-                               f"end_time - start_time = {actual:.0f}s (difference: {ratio:.0%})")
+                               f"声明的 duration_seconds={declared} 与实际时间差 "
+                               f"({actual:.0f}s) 偏差 {ratio:.0%}")
         except (ValueError, OverflowError):
             pass
 
@@ -654,7 +653,7 @@ def check_conditional_fields(data: dict, issues: IssueCollector):
             if not has_reason:
                 issues.add("warning", "conditional_field",
                            f"$.final_results.{section}",
-                           f"status is '{status}' but failure_reason is missing or empty")
+                           f"状态为 '{status}' 但缺少 failure_reason 字段")
 
 
 def check_timestamp_monotonicity(data: dict, issues: IssueCollector):
